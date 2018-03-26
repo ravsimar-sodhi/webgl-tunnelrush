@@ -116,8 +116,6 @@ function initBuffers(gl) {
         positions[k++] = +depth;
 
         angle += (2*Math.PI)/n;
-        // console.log(angle*180/Math.PI);
-        // console.log(k);
     }
 
     /* const positions = [
@@ -172,10 +170,10 @@ function initBuffers(gl) {
         [1.0, 0.0, 0.0, 1.0],    // Back face: red
         [0.0, 1.0, 0.0, 1.0],    // Top face: green
         [1.0, 1.0, 1.0, 1.0],    // Front face: white
-        [1.0, 1.0, 1.0, 1.0],    // Front face: white
         [0.0, 1.0, 0.0, 1.0],    // Top face: green
         [1.0, 1.0, 0.0, 1.0],    // Right face: yellow
         [1.0, 0.0, 1.0, 1.0],    // Left face: purple
+        [1.0, 1.0, 1.0, 1.0],    // Front face: white
     ];
 
     // Convert the array of colors into a table for all the vertices.
@@ -186,8 +184,7 @@ function initBuffers(gl) {
         const c = faceColors[j];
 
         // Repeat each color four times for the four vertices of the face
-        colors = colors.concat(c,c,c,c);
-        console.log(j);
+        colors = colors.concat(c,c);
     }
 
     const colorBuffer = gl.createBuffer();
@@ -214,7 +211,6 @@ function initBuffers(gl) {
         indices[k++] = (2*i+1)%(2*n);
         indices[k++] = (2*i+2)%(2*n);
         indices[k++] = (2*i+3)%(2*n);
-        console.log(k);
     }
     /* const indices = [
         0, 1, 2, 0, 2, 3,    // front
