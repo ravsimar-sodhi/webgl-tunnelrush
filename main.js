@@ -1,6 +1,16 @@
 var tileRotation = 0.0;
 var gameSpeed = 0.05;
 var covDis = 0.0;
+var tileColors = [
+    [0.0, 0.0, 1.0, 1.0],    // blue
+    [1.0, 0.0, 0.0, 1.0],    // red
+    [0.0, 1.0, 0.0, 1.0],    // green
+    [1.0, 0.7, 0.2, 1.0],    // orange
+    [0.5, 0.1, 0.5, 1.0],    // dark purple
+    [1.0, 1.0, 0.0, 1.0],    // yellow
+    [1.0, 0.0, 1.0, 1.0],    // purple
+    [0.2, 1.0, 1.0, 1.0],    // turqoise
+]
 main();
 
 //
@@ -53,11 +63,10 @@ function loadShader(gl, type, source) {
     return shader;
 }
 
-function createPolyhedron(n,radius,zoffset) {
+function createPolyhedron(n, radius, depth, zoffset) {
     var r = radius;
     var k = 0;
     var angle = 0;
-    var depth = 0.75;
     var positions = [];
     for (var i = 0; i < n; i++) {
         positions[k++] = r * Math.cos(angle);
@@ -91,18 +100,13 @@ function createPolyhedron(n,radius,zoffset) {
         indices[k++] = (4 * i + 3) % (4 * n);
         console.log(k);
     }
-
+    var faceColors = [];
+    for(var i=0;i<n;i++)
+    {
+        faceColors[i] = tileColors[Math.floor(Math.random()*n)];
+    }
     return {
-        'faceColors': [
-            [0.0, 0.0, 1.0, 1.0],    // blue
-            [1.0, 0.0, 0.0, 1.0],    // red
-            [0.0, 1.0, 0.0, 1.0],    // green
-            [1.0, 0.7, 0.2, 1.0],    // orange
-            [0.5, 0.1, 0.5, 1.0],    // dark purple
-            [1.0, 1.0, 0.0, 1.0],    // yellow
-            [1.0, 0.0, 1.0, 1.0],    // purple
-            [0.2, 1.0, 1.0, 1.0],    // turqoise
-        ],
+        'faceColors': faceColors,
         'indices': indices,
         'numComponentsColor': 4,
         'numComponentsPosition': 3,
@@ -185,17 +189,25 @@ function main() {
     // Here's where we call the routine that builds all the
     // objects we'll be drawing.
 
+    var tunnelN = 100;
+    var wall = [];
+    var wallBuffers = [];
+    var radius = 1.1;
+    var n = 8;
+    var depth = 0.75;
+    for(var i=0;i<tunnelN;i++)
+    {
+        wall[i] = createPolyhedron(n,radius,depth,-2*i*depth);
+        wallBuffers[i] = initBuffers(gl,wall[i]);
+    }
+    // var shape1 = createPolyhedron(8,1.1,-5);
+    // var shape2 = createPolyhedron(8,1.1,0);
     
-    
-    
-    var shape1 = createPolyhedron(8,1.1,-5);
-    var shape2 = createPolyhedron(8,1.1,0);
-    
-    buffers1 = initBuffers(gl, shape1,/*  positionBuffer, colorBuffer, indexBuffer */);
+    // buffers1 = initBuffers(gl, shape1,/*  positionBuffer, colorBuffer, indexBuffer */);
 
-    buffers2 = initBuffers(gl, shape2,/*  positionBuffer, colorBuffer, indexBuffer */);
+    // buffers2 = initBuffers(gl, shape2,/*  positionBuffer, colorBuffer, indexBuffer */);
     
-    console.log(buffers2);
+    // console.log(buffers2);
     var then = 0;
     
     // Draw the scene repeatedly
@@ -206,8 +218,12 @@ function main() {
         //
         gMat = initScene(gl);
         //
-        drawScene(gl, programInfo, buffers1, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
-        drawScene(gl, programInfo, buffers2, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
+        for(var i=0;i<tunnelN;i++)
+        {
+            drawScene(gl, programInfo, wallBuffers[i], deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
+        }
+        // drawScene(gl, programInfo, buffers1, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
+        // drawScene(gl, programInfo, buffers2, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
 
         requestAnimationFrame(render);
         covDis += gameSpeed;
