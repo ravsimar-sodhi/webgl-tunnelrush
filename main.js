@@ -1,10 +1,11 @@
 var tileRotation = 0.0;
+var obsRotation = 0.0;
 var gameSpeed = 0.05;
 var covDis = 0.0;
 var tileColors = [
-    [0.0, 0.0, 1.0, 1.0],    // blue
-    [1.0, 0.0, 0.0, 1.0],    // red
-    [0.0, 1.0, 0.0, 1.0],    // green
+    [0.2, 0.2, 1.0, 1.0],    // blue
+    [0.6, 0.7, 0.8, 1.0],    // red
+    [0.1, 1.0, 0.1, 1.0],    // green
     [1.0, 0.7, 0.2, 1.0],    // orange
     [0.5, 0.1, 0.5, 1.0],    // dark purple
     [1.0, 1.0, 0.0, 1.0],    // yellow
@@ -114,6 +115,45 @@ function createPolyhedron(n, radius, depth, zoffset) {
         'zoffset': zoffset,
     }
 }
+function createObstacle(n, radius, depth, zoffset)
+{
+    var r = radius;
+    var k = 0;
+    var angle = 0;
+    var positions = [];
+    positions[k++] = 0;
+    positions[k++] = 0;
+    positions[k++] = zoffset;
+    for (var i = 0; i <= n/2; i++) {
+        positions[k++] = r * Math.cos(angle);
+        positions[k++] = r * Math.sin(angle);
+        positions[k++] = zoffset;
+        angle += (2*Math.PI) / n;
+
+    }
+
+    var indices = [];
+    var k = 0;
+    for (var i = 0; i < n/2; i++) {
+        indices[k++] = 0;
+        indices[k++] = (i+1);
+        indices[k++] = (i+2);
+        console.log(k);
+    }
+    var faceColors = [];
+    for (var i = 0; i < n/2; i++) {
+        faceColors[i] = [1.0, 0.0, 0.0, 1.0];
+    }
+    return {
+        'faceColors': faceColors,
+        'indices': indices,
+        'numComponentsColor': 4,
+        'numComponentsPosition': 3,
+        'vertexCount': 12,
+        'positions': positions,
+        'zoffset': zoffset,
+    }
+}
 //
 // Start here
 //
@@ -190,8 +230,11 @@ function main() {
     // objects we'll be drawing.
 
     var tunnelN = 100;
+    var obstacN = 5;
     var wall = [];
     var wallBuffers = [];
+    var obstac = [];
+    var obstacBuffers = [];
     var radius = 1.1;
     var n = 8;
     var depth = 0.5;
@@ -201,14 +244,6 @@ function main() {
         wall[i] = createPolyhedron(n,radius,depth,-2*i*depth);
         wallBuffers[i] = initBuffers(gl,wall[i]);
     }
-    // var shape1 = createPolyhedron(8,1.1,-5);
-    // var shape2 = createPolyhedron(8,1.1,0);
-    
-    // buffers1 = initBuffers(gl, shape1,/*  positionBuffer, colorBuffer, indexBuffer */);
-
-    // buffers2 = initBuffers(gl, shape2,/*  positionBuffer, colorBuffer, indexBuffer */);
-    
-    // console.log(buffers2);
     var then = 0;
     var k = i;
     // Draw the scene repeatedly
@@ -219,7 +254,6 @@ function main() {
         //
         gMat = initScene(gl);
         //
-        // wallBuffers.shift();
         for(var i=0;i<wall.length;i++)
         {
             drawScene(gl, programInfo, wallBuffers[i], deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
@@ -230,14 +264,28 @@ function main() {
             wallBuffers.shift();
             var last = createPolyhedron(n,radius,depth, -2*(k++)*depth);
             wall.push(last);
-            console.log(i);
+            // console.log(i);
             wallBuffers.push(initBuffers(gl,last));
+            if(k%10 == 0)
+            {
+                obs = createObstacle(n, radius, 0.5, -covDis-15);
+                obstac.push(obs);
+                obstacBuffers.push(initBuffers(gl, obs));
+            }
         }
-        // drawScene(gl, programInfo, buffers1, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
-        // drawScene(gl, programInfo, buffers2, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
+        for(var i= 0;i<obstac.length;i++)
+        {
+            var obsModelViewMatrix = mat4.create();
+            mat4.rotate(obsModelViewMatrix,  // destination matrix
+                    gMat.modelViewMatrix,  // matrix to rotate
+                    obsRotation,     // amount to rotate in radians
+                    [0, 0, 1]);       // axis to rotate around (Z)
+            drawScene(gl, programInfo, obstacBuffers[i], deltaTime, gMat.projectionMatrix, obsModelViewMatrix);
+        }
 
         requestAnimationFrame(render);
         covDis += gameSpeed;
+        obsRotation -= gameSpeed/3;
     }
     requestAnimationFrame(render);
 }
@@ -281,7 +329,7 @@ function initScene(gl){
 
     mat4.translate(modelViewMatrix,     // destination matrix
         modelViewMatrix,     // matrix to translate
-        [-0.0, 0.0, covDis]);  // amount to translate
+        [0.0, 0.7, covDis]);  // amount to translate
     mat4.rotate(modelViewMatrix,  // destination matrix
         modelViewMatrix,  // matrix to rotate
         tileRotation,     // amount to rotate in radians
@@ -331,6 +379,7 @@ function initBuffers(gl,shape/* , positionBuffer, colorBuffer, indexBuffer */) {
         position: positionBuffer,
         color: colorBuffer,
         indices: indexBuffer,
+        vertexCount: shape.vertexCount,
     };
 }
 
@@ -343,7 +392,7 @@ function drawScene(gl, programInfo, buffers, deltaTime, projectionMatrix, modelV
 
     // Tell WebGL how to pull out the positions from the position
     // buffer into the vertexPosition attribute
-
+    
     {
         const numComponents = 3;
         const type = gl.FLOAT;
@@ -401,7 +450,7 @@ function drawScene(gl, programInfo, buffers, deltaTime, projectionMatrix, modelV
         modelViewMatrix);
 
     {
-        const vertexCount = 8*6;
+        const vertexCount = buffers.vertexCount;
         const type = gl.UNSIGNED_SHORT;
         const offset = 0;
         gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
