@@ -98,7 +98,6 @@ function createPolyhedron(n, radius, depth, zoffset) {
         indices[k++] = (4 * i + 1) % (4 * n);
         indices[k++] = (4 * i + 2) % (4 * n);
         indices[k++] = (4 * i + 3) % (4 * n);
-        console.log(k);
     }
     var faceColors = [];
     for(var i=0;i<n;i++)
@@ -112,6 +111,7 @@ function createPolyhedron(n, radius, depth, zoffset) {
         'numComponentsPosition': 3,
         'vertexCount': 48,
         'positions': positions,
+        'zoffset': zoffset,
     }
 }
 //
@@ -123,11 +123,11 @@ function main() {
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     document.addEventListener('keydown', function (event) {
         if (event.keyCode == 65) {
-            tileRotation += 0.04;
+            tileRotation += 0.02;
             // alert('Left was pressed');
         }
         else if (event.keyCode == 68) {
-            tileRotation -= 0.03;
+            tileRotation -= 0.02;
             // alert('Right was pressed');
         }
         
@@ -194,8 +194,9 @@ function main() {
     var wallBuffers = [];
     var radius = 1.1;
     var n = 8;
-    var depth = 0.75;
-    for(var i=0;i<tunnelN;i++)
+    var depth = 0.5;
+    var i = 0;
+    for(;i<tunnelN;i++)
     {
         wall[i] = createPolyhedron(n,radius,depth,-2*i*depth);
         wallBuffers[i] = initBuffers(gl,wall[i]);
@@ -209,7 +210,7 @@ function main() {
     
     // console.log(buffers2);
     var then = 0;
-    
+    var k = i;
     // Draw the scene repeatedly
     function render(now) {
         now *= 0.001;  // convert to seconds
@@ -218,9 +219,19 @@ function main() {
         //
         gMat = initScene(gl);
         //
-        for(var i=0;i<tunnelN;i++)
+        // wallBuffers.shift();
+        for(var i=0;i<wall.length;i++)
         {
             drawScene(gl, programInfo, wallBuffers[i], deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
+        }
+        if(-wall[0].zoffset < covDis)
+        {
+            wall.shift();
+            wallBuffers.shift();
+            var last = createPolyhedron(n,radius,depth, -2*(k++)*depth);
+            wall.push(last);
+            console.log(i);
+            wallBuffers.push(initBuffers(gl,last));
         }
         // drawScene(gl, programInfo, buffers1, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
         // drawScene(gl, programInfo, buffers2, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
