@@ -2,6 +2,8 @@ var tileRotation = 0.0;
 var obsRotation = 0.0;
 var gameSpeed = 0.05;
 var covDis = 0.0;
+var currPos = {x: 0.0,y:0.7,z:covDis};
+var left,right,jump;
 var tileColors = [
     [0.2, 0.2, 1.0, 1.0],    // blue
     [0.6, 0.7, 0.8, 1.0],    // red
@@ -108,8 +110,8 @@ function createPolyhedron(n, radius, depth, zoffset) {
     return {
         'faceColors': faceColors,
         'indices': indices,
-        'numComponentsColor': 4,
-        'numComponentsPosition': 3,
+        'colNumComponents': 4,
+        'posNumComponents': 3,
         'vertexCount': 48,
         'positions': positions,
         'zoffset': zoffset,
@@ -147,12 +149,182 @@ function createObstacle(n, radius, depth, zoffset)
     return {
         'faceColors': faceColors,
         'indices': indices,
-        'numComponentsColor': 4,
-        'numComponentsPosition': 3,
+        'colNumComponents': 4,
+        'posNumComponents': 3,
         'vertexCount': 12,
         'positions': positions,
         'zoffset': zoffset,
     }
+}
+function initScene(gl) {
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
+    gl.clearDepth(1.0);                 // Clear everything
+    gl.enable(gl.DEPTH_TEST);           // Enable depth testing
+    gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
+
+    // Clear the canvas before we start drawing on it.
+
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    // Create a perspective matrix, a special matrix that is
+    // used to simulate the distortion of perspective in a camera.
+    // Our field of view is 45 degrees, with a width/height
+    // ratio that matches the display size of the canvas
+    // and we only want to see objects between 0.1 units
+    // and 100 units away from the camera.
+
+    const fieldOfView = 45 * Math.PI / 180;   // in radians
+    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    const zNear = 0.1;
+    const zFar = 100.0;
+    const projectionMatrix = mat4.create();
+
+    // note: glmatrix.js always has the first argument
+    // as the destination to receive the result.
+    mat4.perspective(projectionMatrix,
+        fieldOfView,
+        aspect,
+        zNear,
+        zFar);
+
+    // Set the drawing position to the "identity" point, which is
+    // the center of the scene.
+    const modelViewMatrix = mat4.create();
+
+    // Now move the drawing position a bit to where we want to
+    // start drawing the square.
+
+    mat4.translate(modelViewMatrix,     // destination matrix
+        modelViewMatrix,     // matrix to translate
+        [currPos.x, currPos.y, currPos.z]);  // amount to translate
+    mat4.rotate(modelViewMatrix,  // destination matrix
+        modelViewMatrix,  // matrix to rotate
+        tileRotation,     // amount to rotate in radians
+        [0, 0, 1]);       // axis to rotate around (Z)
+    return { projectionMatrix, modelViewMatrix };
+}
+function initBuffers(gl, shape) {
+    positionBuffer = gl.createBuffer();
+    colorBuffer = gl.createBuffer();
+    indexBuffer = gl.createBuffer();
+    // Create a buffer for the cube's vertex positions.
+    var positions = shape.positions;
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+    // Convert the array of colors into a table for all the vertices.
+
+    var colors = [];
+    var faceColors = shape.faceColors;
+
+    for (var j = 0; j < faceColors.length; ++j) {
+        const c = faceColors[j];
+        // Repeat each color four times for the four vertices of the face
+        colors = colors.concat(c, c, c, c);
+    }
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+    // Build the element array buffer; this specifies the indices
+    // into the vertex arrays for each face's vertices.
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+    // This array defines each face as two triangles, using the
+    // indices into the vertex array to specify each triangle's
+    // position.
+    // Now send the element array to GL
+    var indices = shape.indices;
+
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
+        new Uint16Array(indices), gl.STATIC_DRAW);
+
+    return {
+        position: positionBuffer,
+        color: colorBuffer,
+        indices: indexBuffer,
+        vertexCount: shape.vertexCount,
+        posNumComponents: shape.posNumComponents,
+        colNumComponents: shape.colNumComponents,  
+    };
+}
+
+//
+// Draw the scene.
+//
+function drawScene(gl, programInfo, buffers, deltaTime, projectionMatrix, modelViewMatrix) {
+    // Tell WebGL how to pull out the positions from the position
+    // buffer into the vertexPosition attribute
+
+    {
+        const numComponents = buffers.posNumComponents;
+        const type = gl.FLOAT;
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+        gl.vertexAttribPointer(
+            programInfo.attribLocations.vertexPosition,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        gl.enableVertexAttribArray(
+            programInfo.attribLocations.vertexPosition);
+    }
+
+    // Tell WebGL how to pull out the colors from the color buffer
+    // into the vertexColor attribute.
+    {
+        const numComponents = buffers.colNumComponents;
+        const type = gl.FLOAT;
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
+        gl.vertexAttribPointer(
+            programInfo.attribLocations.vertexColor,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        gl.enableVertexAttribArray(
+            programInfo.attribLocations.vertexColor);
+    }
+
+    // Tell WebGL which indices to use to index the vertices
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
+
+    // Tell WebGL to use our program when drawing
+
+    gl.useProgram(programInfo.program);
+
+    // Set the shader uniforms
+
+    gl.uniformMatrix4fv(
+        programInfo.uniformLocations.projectionMatrix,
+        false,
+        projectionMatrix);
+    gl.uniformMatrix4fv(
+        programInfo.uniformLocations.modelViewMatrix,
+        false,
+        modelViewMatrix);
+
+    {
+        const vertexCount = buffers.vertexCount;
+        const type = gl.UNSIGNED_SHORT;
+        const offset = 0;
+        gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+    }
+
+    // Update the rotation for the next draw
+
+    // tileRotation += deltaTime;
 }
 //
 // Start here
@@ -163,15 +335,23 @@ function main() {
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     document.addEventListener('keydown', function (event) {
         if (event.keyCode == 65) {
-            tileRotation += 0.02;
+            left = 1;
+            // tileRotation += 0.02;
             // alert('Left was pressed');
         }
-        else if (event.keyCode == 68) {
-            tileRotation -= 0.02;
+        if (event.keyCode == 68) {
+            right = 1;
+            // tileRotation -= 0.02;
             // alert('Right was pressed');
         }
-        
+
+
     });
+    document.addEventListener('keyup', function (event) {
+        if (event.keyCode == 32) {
+            jump = 1;
+        }
+    })
     // If we don't have a GL context, give up now
 
     if (!gl) {
@@ -284,180 +464,40 @@ function main() {
         }
 
         requestAnimationFrame(render);
+        
         covDis += gameSpeed;
+        currPos.z = covDis;
         obsRotation -= gameSpeed/3;
+        
+        if (left == 1) {
+            tileRotation += 2*deltaTime;
+            left = 0;
+        }
+        if (right == 1) {
+            tileRotation -= 2*deltaTime;
+            right = 0;
+        }
+        if(jump == 1)
+        {
+            if(currPos.y > -0.5)
+            {
+                currPos.y  -= 2*deltaTime;
+            }
+            else
+            {
+                jump = 0;
+            }
+        }
+        else
+        {
+            if(currPos.y < 0.7)
+            {
+                currPos.y += 2*deltaTime;
+            }
+        }
+        
     }
     requestAnimationFrame(render);
 }
-function initScene(gl){
-    gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
-    gl.clearDepth(1.0);                 // Clear everything
-    gl.enable(gl.DEPTH_TEST);           // Enable depth testing
-    gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
 
-    // Clear the canvas before we start drawing on it.
-
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-    // Create a perspective matrix, a special matrix that is
-    // used to simulate the distortion of perspective in a camera.
-    // Our field of view is 45 degrees, with a width/height
-    // ratio that matches the display size of the canvas
-    // and we only want to see objects between 0.1 units
-    // and 100 units away from the camera.
-
-    const fieldOfView = 45 * Math.PI / 180;   // in radians
-    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-    const zNear = 0.1;
-    const zFar = 100.0;
-    const projectionMatrix = mat4.create();
-
-    // note: glmatrix.js always has the first argument
-    // as the destination to receive the result.
-    mat4.perspective(projectionMatrix,
-        fieldOfView,
-        aspect,
-        zNear,
-        zFar);
-
-    // Set the drawing position to the "identity" point, which is
-    // the center of the scene.
-    const modelViewMatrix = mat4.create();
-
-    // Now move the drawing position a bit to where we want to
-    // start drawing the square.
-
-    mat4.translate(modelViewMatrix,     // destination matrix
-        modelViewMatrix,     // matrix to translate
-        [0.0, 0.7, covDis]);  // amount to translate
-    mat4.rotate(modelViewMatrix,  // destination matrix
-        modelViewMatrix,  // matrix to rotate
-        tileRotation,     // amount to rotate in radians
-        [0, 0, 1]);       // axis to rotate around (Z)
-    return {projectionMatrix, modelViewMatrix};
-}
-function initBuffers(gl,shape/* , positionBuffer, colorBuffer, indexBuffer */) {
-    positionBuffer = gl.createBuffer();
-    colorBuffer = gl.createBuffer();
-    indexBuffer = gl.createBuffer();
-    // Create a buffer for the cube's vertex positions.
-    var positions = shape.positions;
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-
-    // Convert the array of colors into a table for all the vertices.
-
-    var colors = [];
-    var faceColors = shape.faceColors;
-
-    for (var j = 0; j < faceColors.length; ++j) {
-        const c = faceColors[j];
-        // Repeat each color four times for the four vertices of the face
-        colors = colors.concat(c,c,c,c);
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
-
-    // Build the element array buffer; this specifies the indices
-    // into the vertex arrays for each face's vertices.
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-
-    // This array defines each face as two triangles, using the
-    // indices into the vertex array to specify each triangle's
-    // position.
-    // Now send the element array to GL
-    var indices = shape.indices;
-    
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
-        new Uint16Array(indices), gl.STATIC_DRAW);
-
-    return {
-        position: positionBuffer,
-        color: colorBuffer,
-        indices: indexBuffer,
-        vertexCount: shape.vertexCount,
-    };
-}
-
-//
-// Draw the scene.
-//
-function drawScene(gl, programInfo, buffers, deltaTime, projectionMatrix, modelViewMatrix) {
-   
-    
-
-    // Tell WebGL how to pull out the positions from the position
-    // buffer into the vertexPosition attribute
-    
-    {
-        const numComponents = 3;
-        const type = gl.FLOAT;
-        const normalize = false;
-        const stride = 0;
-        const offset = 0;
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
-        gl.vertexAttribPointer(
-            programInfo.attribLocations.vertexPosition,
-            numComponents,
-            type,
-            normalize,
-            stride,
-            offset);
-        gl.enableVertexAttribArray(
-            programInfo.attribLocations.vertexPosition);
-    }
-
-    // Tell WebGL how to pull out the colors from the color buffer
-    // into the vertexColor attribute.
-    {
-        const numComponents = 4;
-        const type = gl.FLOAT;
-        const normalize = false;
-        const stride = 0;
-        const offset = 0;
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
-        gl.vertexAttribPointer(
-            programInfo.attribLocations.vertexColor,
-            numComponents,
-            type,
-            normalize,
-            stride,
-            offset);
-        gl.enableVertexAttribArray(
-            programInfo.attribLocations.vertexColor);
-    }
-
-    // Tell WebGL which indices to use to index the vertices
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
-
-    // Tell WebGL to use our program when drawing
-
-    gl.useProgram(programInfo.program);
-
-    // Set the shader uniforms
-
-    gl.uniformMatrix4fv(
-        programInfo.uniformLocations.projectionMatrix,
-        false,
-        projectionMatrix);
-    gl.uniformMatrix4fv(
-        programInfo.uniformLocations.modelViewMatrix,
-        false,
-        modelViewMatrix);
-
-    {
-        const vertexCount = buffers.vertexCount;
-        const type = gl.UNSIGNED_SHORT;
-        const offset = 0;
-        gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
-    }
-
-    // Update the rotation for the next draw
-
-    // tileRotation += deltaTime;
-}
 
