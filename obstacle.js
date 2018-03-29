@@ -1,16 +1,18 @@
-function Obstacle(n, radius, depth, zoffset) {
+function Obstacle(n, radius, depth, zoffset, rot, rotSpeed) {
     this.n = n;
     this.radius = radius;
     this.depth = depth;
     this.zoffset = zoffset;
-    this.createShape = createObstacle(this.n, this.radius, this.depth, this.zoffset);
+    this.createShape = createObstacle(this.n, this.radius, this.depth, this.zoffset,rot);
     this.createBuffers = initObstacleBuffers(gl, this.createShape);
+    this.rot = rot;
+    this.rotSpeed = rotSpeed;
     return this;
 }
-function createObstacle(n, radius, depth, zoffset) {
+function createObstacle(n, radius, depth, zoffset,rot) {
     var r = radius;
     var k = 0;
-    var angle = 0;
+    var angle = rot;
     var positions = [];
     positions[k++] = 0;
     positions[k++] = 0;
@@ -22,23 +24,33 @@ function createObstacle(n, radius, depth, zoffset) {
         angle += (2 * Math.PI) / n;
 
     }
-
+    var normals = [];
+    var k = 0;
+    normals[k++] = 0;
+    normals[k++] = 0;
+    normals[k++] = 1.0;
+    for(var  i=0;i<=n/2;i++)
+    {
+        normals[k++] = 0;
+        normals[k++] = 0;
+        normals[k++] = -1.0;
+    }
     var indices = [];
     var k = 0;
     for (var i = 0; i < n / 2; i++) {
         indices[k++] = 0;
         indices[k++] = (i + 1);
         indices[k++] = (i + 2);
-        console.log(k);
     }
 
     return {
         // 'faceColors': faceColors,
+        'positions': positions,
+        'normals' : normals,
         'indices': indices,
         'colNumComponents': 4,
         'posNumComponents': 3,
         'vertexCount': 12,
-        'positions': positions,
         'zoffset': zoffset,
     }
 }
@@ -47,14 +59,20 @@ function initObstacleBuffers(gl, shape) {
     colorBuffer = gl.createBuffer();
     indexBuffer = gl.createBuffer();
     textureBuffer = gl.createBuffer();
+    normalBuffer = gl.createBuffer();
 
     // Create a buffer for the cube's vertex positions.
     var positions = shape.positions;
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
+    
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+    
+    var normals = shape.normals;
 
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+    
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
     // Convert the array of colors into a table for all the vertices.
 
     /*  var colors = [];
@@ -72,18 +90,24 @@ function initObstacleBuffers(gl, shape) {
     gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
     var textureCoordinates = [];
     var k = 0;
-    for (var i = 0; i < shape.indices.length / 3; i++) {
-        // textureCoordinates[k++] = 0.0;
-        // textureCoordinates[k++] = 0.0;
+    for (var i = 0; i < shape.indices.length/3 ; i++) {
+        textureCoordinates[k++] = 0.0;
+        textureCoordinates[k++] = 0.0;
+        
+        textureCoordinates[k++] = 1.0;
+        textureCoordinates[k++] = 0.0;
 
-        // textureCoordinates[k++] = 1.0;
-        // textureCoordinates[k++] = 0.0;
+        textureCoordinates[k++] = 0.0;
+        textureCoordinates[k++] = 1.0;
 
         textureCoordinates[k++] = 1.0;
         textureCoordinates[k++] = 1.0;
 
         textureCoordinates[k++] = 0.0;
-        textureCoordinates[k++] = 0.0;
+        textureCoordinates[k++] = 1.0;
+
+        textureCoordinates[k++] = 1.0;
+        textureCoordinates[k++] = 1.0;
     }
 
 
@@ -104,9 +128,10 @@ function initObstacleBuffers(gl, shape) {
 
     return {
         position: positionBuffer,
+        normal: normalBuffer,
+        indices: indexBuffer,
         // color: colorBuffer,
         texture: textureBuffer,
-        indices: indexBuffer,
         vertexCount: shape.vertexCount,
         posNumComponents: shape.posNumComponents,
         colNumComponents: shape.colNumComponents,

@@ -33,7 +33,33 @@ function createPolyhedron(n, radius, depth, zoffset) {
         positions[k++] = r * Math.sin(angle);
         positions[k++] = zoffset + depth;
     }
+    var normals = [];
+    // normals = positions;
+    var k = 0;
+    var angle = Math.PI/n;
+    for (var i = 0; i < n; i++) {
+        normals[k++] = Math.cos(angle);
+        normals[k++] = Math.sin(angle);
+        // normals[k++] = zoffset;
+        normals[k++] = 0;
 
+        normals[k++] = Math.cos(angle);
+        normals[k++] = Math.sin(angle);
+        // normals[k++] = zoffset;
+        normals[k++] = 0;
+        
+        angle += (2* Math.PI)/n;
+
+        normals[k++] = Math.cos(angle);
+        normals[k++] = Math.sin(angle);
+        // normals[k++] = zoffset;
+        normals[k++] = 0;
+        
+        normals[k++] = Math.cos(angle);
+        normals[k++] = Math.sin(angle);
+        // normals[k++] = zoffset;
+        normals[k++] = 0;
+    }
     var indices = [];
     var k = 0;
     for (var i = 0; i < n; i++) {
@@ -45,6 +71,7 @@ function createPolyhedron(n, radius, depth, zoffset) {
         indices[k++] = (4 * i + 2) % (4 * n);
         indices[k++] = (4 * i + 3) % (4 * n);
     }
+   
     /* var faceColors = [];
     for(var i=0;i<n;i++)
     {
@@ -52,11 +79,12 @@ function createPolyhedron(n, radius, depth, zoffset) {
     } */
     return {
         // 'faceColors': faceColors,
-        'indices': indices,
         'colNumComponents': 4,
         'posNumComponents': 3,
         'vertexCount': 48,
         'positions': positions,
+        'normals': normals,
+        'indices': indices,
         'zoffset': zoffset,
     }
 }
@@ -65,6 +93,7 @@ function initPolyhedronBuffers(gl, shape) {
     colorBuffer = gl.createBuffer();
     indexBuffer = gl.createBuffer();
     textureBuffer = gl.createBuffer();
+    normalBuffer = gl.createBuffer();
 
     // Create a buffer for the cube's vertex positions.
     var positions = shape.positions;
@@ -72,6 +101,12 @@ function initPolyhedronBuffers(gl, shape) {
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+    
+    var normals = shape.normals;
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
 
     // Convert the array of colors into a table for all the vertices.
 
@@ -121,10 +156,11 @@ function initPolyhedronBuffers(gl, shape) {
         new Uint16Array(indices), gl.STATIC_DRAW);
 
     return {
-        position: positionBuffer,
         // color: colorBuffer,
-        texture: textureBuffer,
+        position: positionBuffer,
+        normal: normalBuffer,
         indices: indexBuffer,
+        texture: textureBuffer,
         vertexCount: shape.vertexCount,
         posNumComponents: shape.posNumComponents,
         colNumComponents: shape.colNumComponents,

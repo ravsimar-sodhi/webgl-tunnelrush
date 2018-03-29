@@ -164,7 +164,10 @@ function initScene(gl) {
         modelViewMatrix,  // matrix to rotate
         tileRotation,     // amount to rotate in radians
         [0, 0, 1]);       // axis to rotate around (Z)
-    return { projectionMatrix, modelViewMatrix };
+    const normalMatrix = mat4.create();
+    mat4.invert(normalMatrix, modelViewMatrix);
+    mat4.transpose(normalMatrix, normalMatrix);
+    return { projectionMatrix, modelViewMatrix, normalMatrix };
 }
 function initBuffers(gl, shape) {
     positionBuffer = gl.createBuffer();
@@ -241,7 +244,7 @@ function initBuffers(gl, shape) {
 //
 // Draw the scene.
 //
-function drawScene(gl, programInfo, buffers, texture, deltaTime, projectionMatrix, modelViewMatrix) {
+function drawScene(gl, programInfo, buffers, texture, deltaTime, projectionMatrix, modelViewMatrix, normalMatrix) {
     // Tell WebGL how to pull out the positions from the position
     // buffer into the vertexPosition attribute
 
@@ -282,6 +285,23 @@ function drawScene(gl, programInfo, buffers, texture, deltaTime, projectionMatri
         gl.enableVertexAttribArray(
             programInfo.attribLocations.vertexColor);
     } */
+    {
+        const numComponents = 3;
+        const type = gl.FLOAT;
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.normal);
+        gl.vertexAttribPointer(
+            programInfo.attribLocations.vertexNormal,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        gl.enableVertexAttribArray(
+            programInfo.attribLocations.vertexNormal);
+    }
 
     {
         const numComponents = 2;
@@ -317,6 +337,10 @@ function drawScene(gl, programInfo, buffers, texture, deltaTime, projectionMatri
         programInfo.uniformLocations.modelViewMatrix,
         false,
         modelViewMatrix);
+    gl.uniformMatrix4fv(
+        programInfo.uniformLocations.normalMatrix,
+        false,
+        normalMatrix);
 
     // Specify the texture to map onto the faces.
 
@@ -376,25 +400,43 @@ function main() {
 
     // Vertex shader program
 
-    const vsSource = `
+    vsSource = `
     attribute vec4 aVertexPosition;
+    attribute vec3 aVertexNormal;
     attribute vec2 aTextureCoord;
+    
+    uniform mat4 uNormalMatrix;
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
+    
     varying highp vec2 vTextureCoord;
+    varying highp vec3 vLighting;
+    
     void main(void) {
       gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
       vTextureCoord = aTextureCoord;
+      // Apply lighting effect
+      highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
+      highp vec3 directionalLightColor = vec3(1, 1, 1);
+      highp vec3 directionalVector = normalize(vec3(0.5, -1.0, 1.0));
+      
+      highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+      
+      highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+      vLighting = ambientLight + (directionalLightColor * directional);
     }
   `;
 
     // Fragment shader program
 
-    fsSource = `
+    const fsSource = `
     varying highp vec2 vTextureCoord;
+    varying highp vec3 vLighting;
+    
     uniform sampler2D uSampler;
     void main(void) {
-      gl_FragColor = texture2D(uSampler, vTextureCoord);
+      highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+      gl_FragColor = vec4(texelColor.rgb * vLighting, texelColor.a);
     }
   `;
 
@@ -410,11 +452,13 @@ function main() {
         program: shaderProgram,
         attribLocations: {
             vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+            vertexNormal: gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
             textureCoord: gl.getAttribLocation(shaderProgram, 'aTextureCoord'),
         },
         uniformLocations: {
             projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
             modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+            normalMatrix: gl.getUniformLocation(shaderProgram, 'uNormalMatrix'),
             uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
         },
     };
@@ -436,7 +480,7 @@ function main() {
     brickTexture = loadTexture(gl, 'brickTexture.jpeg');
     // brickTexture2 = loadTexture(gl, 'cubetexture.png');
 
-    brickTexture2 = loadTexture(gl, 'brickTexture2.jpeg');
+    brickTexture2 = loadTexture(gl, 'metalTexture.jpeg');
 
     for(;i<tunnelN;i++)
     {
@@ -458,7 +502,7 @@ function main() {
         //
         for(var l=0;l<wall.length;l++)
         {
-            drawScene(gl, programInfo, wallBuffers[l], brickTexture, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
+            drawScene(gl, programInfo, wallBuffers[l], brickTexture, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix, gMat.normalMatrix);
         }
         if(-wall[0].zoffset < covDis)
         {
@@ -471,28 +515,35 @@ function main() {
             wallBuffers.push(last.createBuffers);
             if(k%10 == 0)
             {
+                rot = Math.random()*3;
+                rotSpeed = Math.random()*0.05;
                 // obs = createObstacle(n, radius, 0.5, -covDis-15);
-                obs  = new Obstacle(n, radius, 0.5, -covDis -15);
+                obs  = new Obstacle(n, radius, 0.5, -covDis-15, rot, rotSpeed);
                 obstac.push(obs);
                 // obstacBuffers.push(initBuffers(gl, obs));
                 obstacBuffers.push(obs.createBuffers);
+                console.log(obs);
             }
         }
         for(var i= 0;i<obstac.length;i++)
         {
+            // console.log(obstac[i].rot);
             var obsModelViewMatrix = mat4.create();
             mat4.rotate(obsModelViewMatrix,  // destination matrix
                     gMat.modelViewMatrix,  // matrix to rotate
-                    obsRotation,     // amount to rotate in radians
+                    // obsRotation,
+                    obstac[i].rot,     // amount to rotate in radians
                     [0, 0, 1]);       // axis to rotate around (Z)
-            drawScene(gl, programInfo, obstacBuffers[i], brickTexture2, deltaTime, gMat.projectionMatrix, obsModelViewMatrix);
+            // console.log(obstac[i].rotSpeed);
+            obstac[i].rot += obstac[i].rotSpeed;
+            drawScene(gl, programInfo, obstacBuffers[i], brickTexture2, deltaTime, gMat.projectionMatrix, obsModelViewMatrix,gMat.normalMatrix);
         }
 
         requestAnimationFrame(render);
         
         covDis += gameSpeed;
         currPos.z = covDis;
-        obsRotation -= gameSpeed/3;
+        // obsRotation -= gameSpeed/3;
         
         if (left == 1) {
             tileRotation += 2*deltaTime;
