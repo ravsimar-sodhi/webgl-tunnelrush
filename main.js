@@ -4,6 +4,8 @@ var gameSpeed = 0.05;
 var covDis = 0.0;
 var currPos = {x: 0.0,y:0.7,z:covDis};
 var left,right,jump;
+var texture;
+
 var tileColors = [
     [0.2, 0.2, 1.0, 1.0],    // blue
     [0.6, 0.7, 0.8, 1.0],    // red
@@ -19,6 +21,9 @@ main();
 //
 // Initialize a shader program, so WebGL knows how to draw our data
 //
+function isPowerOf2(value) {
+    return (value & (value - 1)) == 0;
+}
 function initShaderProgram(gl, vsSource, fsSource) {
     const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
     const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
@@ -65,97 +70,55 @@ function loadShader(gl, type, source) {
 
     return shader;
 }
+function loadTexture(gl, url) {
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
 
-function createPolyhedron(n, radius, depth, zoffset) {
-    var r = radius;
-    var k = 0;
-    var angle = 0;
-    var positions = [];
-    for (var i = 0; i < n; i++) {
-        positions[k++] = r * Math.cos(angle);
-        positions[k++] = r * Math.sin(angle);
-        positions[k++] = zoffset - depth;
+    // Because images have to be download over the internet
+    // they might take a moment until they are ready.
+    // Until then put a single pixel in the texture so we can
+    // use it immediately. When the image has finished downloading
+    // we'll update the texture with the contents of the image.
+    const level = 0;
+    const internalFormat = gl.RGBA;
+    const width = 1;
+    const height = 1;
+    const border = 0;
+    const srcFormat = gl.RGBA;
+    const srcType = gl.UNSIGNED_BYTE;
+    const pixel = new Uint8Array([200, 0, 255, 255]);  // opaque blue
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
+        width, height, border, srcFormat, srcType,
+        pixel);
 
-        positions[k++] = r * Math.cos(angle);
-        positions[k++] = r * Math.sin(angle);
-        positions[k++] = zoffset + depth;
+    const image = new Image();
+    image.onload = function () {
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
+            srcFormat, srcType, image);
+        
+        // WebGL1 has different requirements for power of 2 images
+        // vs non power of 2 images so check if the image is a
+        // power of 2 in both dimensions.
+        if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+            // Yes, it's a power of 2. Generate mips.
+            gl.generateMipmap(gl.TEXTURE_2D);
+        } else {
+            // No, it's not a power of 2. Turn of mips and set
+            // wrapping to clamp to edge
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        }
+        console.log("lulz");
+    };
+    image.src = url;
+    console.log(image.src);
 
-        angle += (2 * Math.PI) / n;
-
-        positions[k++] = r * Math.cos(angle);
-        positions[k++] = r * Math.sin(angle);
-        positions[k++] = zoffset - depth;
-
-        positions[k++] = r * Math.cos(angle);
-        positions[k++] = r * Math.sin(angle);
-        positions[k++] = zoffset + depth;
-    }
-
-    var indices = [];
-    var k = 0;
-    for (var i = 0; i < n; i++) {
-        indices[k++] = (4 * i) % (4 * n);
-        indices[k++] = (4 * i + 1) % (4 * n);
-        indices[k++] = (4 * i + 2) % (4 * n);
-
-        indices[k++] = (4 * i + 1) % (4 * n);
-        indices[k++] = (4 * i + 2) % (4 * n);
-        indices[k++] = (4 * i + 3) % (4 * n);
-    }
-    var faceColors = [];
-    for(var i=0;i<n;i++)
-    {
-        faceColors[i] = tileColors[Math.floor(Math.random()*n)];
-    }
-    return {
-        'faceColors': faceColors,
-        'indices': indices,
-        'colNumComponents': 4,
-        'posNumComponents': 3,
-        'vertexCount': 48,
-        'positions': positions,
-        'zoffset': zoffset,
-    }
+    return texture;
 }
-function createObstacle(n, radius, depth, zoffset)
-{
-    var r = radius;
-    var k = 0;
-    var angle = 0;
-    var positions = [];
-    positions[k++] = 0;
-    positions[k++] = 0;
-    positions[k++] = zoffset;
-    for (var i = 0; i <= n/2; i++) {
-        positions[k++] = r * Math.cos(angle);
-        positions[k++] = r * Math.sin(angle);
-        positions[k++] = zoffset;
-        angle += (2*Math.PI) / n;
 
-    }
 
-    var indices = [];
-    var k = 0;
-    for (var i = 0; i < n/2; i++) {
-        indices[k++] = 0;
-        indices[k++] = (i+1);
-        indices[k++] = (i+2);
-        console.log(k);
-    }
-    var faceColors = [];
-    for (var i = 0; i < n/2; i++) {
-        faceColors[i] = [1.0, 0.0, 0.0, 1.0];
-    }
-    return {
-        'faceColors': faceColors,
-        'indices': indices,
-        'colNumComponents': 4,
-        'posNumComponents': 3,
-        'vertexCount': 12,
-        'positions': positions,
-        'zoffset': zoffset,
-    }
-}
 function initScene(gl) {
     gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
     gl.clearDepth(1.0);                 // Clear everything
@@ -207,6 +170,8 @@ function initBuffers(gl, shape) {
     positionBuffer = gl.createBuffer();
     colorBuffer = gl.createBuffer();
     indexBuffer = gl.createBuffer();
+    textureBuffer = gl.createBuffer();
+ 
     // Create a buffer for the cube's vertex positions.
     var positions = shape.positions;
 
@@ -216,7 +181,7 @@ function initBuffers(gl, shape) {
 
     // Convert the array of colors into a table for all the vertices.
 
-    var colors = [];
+   /*  var colors = [];
     var faceColors = shape.faceColors;
 
     for (var j = 0; j < faceColors.length; ++j) {
@@ -226,8 +191,28 @@ function initBuffers(gl, shape) {
     }
 
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW); */
 
+    gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+    var textureCoordinates = [];
+    var k = 0;
+    for(var i=0;i<shape.indices.length/3;i++)
+    {
+        textureCoordinates[k++] = 0.0;
+        textureCoordinates[k++] = 0.0;
+        
+        // textureCoordinates[k++] = 1.0;
+        // textureCoordinates[k++] = 0.0;
+        
+        textureCoordinates[k++] = 1.0;
+        textureCoordinates[k++] = 1.0;
+        
+        textureCoordinates[k++] = 0.0;
+        textureCoordinates[k++] = 1.0;
+    }
+
+
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
     // Build the element array buffer; this specifies the indices
     // into the vertex arrays for each face's vertices.
 
@@ -244,7 +229,8 @@ function initBuffers(gl, shape) {
 
     return {
         position: positionBuffer,
-        color: colorBuffer,
+        // color: colorBuffer,
+        texture: textureBuffer,
         indices: indexBuffer,
         vertexCount: shape.vertexCount,
         posNumComponents: shape.posNumComponents,
@@ -255,7 +241,7 @@ function initBuffers(gl, shape) {
 //
 // Draw the scene.
 //
-function drawScene(gl, programInfo, buffers, deltaTime, projectionMatrix, modelViewMatrix) {
+function drawScene(gl, programInfo, buffers, texture, deltaTime, projectionMatrix, modelViewMatrix) {
     // Tell WebGL how to pull out the positions from the position
     // buffer into the vertexPosition attribute
 
@@ -279,7 +265,7 @@ function drawScene(gl, programInfo, buffers, deltaTime, projectionMatrix, modelV
 
     // Tell WebGL how to pull out the colors from the color buffer
     // into the vertexColor attribute.
-    {
+    /* {
         const numComponents = buffers.colNumComponents;
         const type = gl.FLOAT;
         const normalize = false;
@@ -295,8 +281,25 @@ function drawScene(gl, programInfo, buffers, deltaTime, projectionMatrix, modelV
             offset);
         gl.enableVertexAttribArray(
             programInfo.attribLocations.vertexColor);
-    }
+    } */
 
+    {
+        const numComponents = 2;
+        const type = gl.FLOAT;
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.texture);
+        gl.vertexAttribPointer(
+            programInfo.attribLocations.textureCoord,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        gl.enableVertexAttribArray(
+            programInfo.attribLocations.textureCoord);
+    }
     // Tell WebGL which indices to use to index the vertices
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
 
@@ -315,6 +318,17 @@ function drawScene(gl, programInfo, buffers, deltaTime, projectionMatrix, modelV
         false,
         modelViewMatrix);
 
+    // Specify the texture to map onto the faces.
+
+    // Tell WebGL we want to affect texture unit 0
+    gl.activeTexture(gl.TEXTURE0);
+
+    // Bind the texture to texture unit 0
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    // Tell the shader we bound the texture to texture unit 0
+    gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
+
     {
         const vertexCount = buffers.vertexCount;
         const type = gl.UNSIGNED_SHORT;
@@ -329,9 +343,10 @@ function drawScene(gl, programInfo, buffers, deltaTime, projectionMatrix, modelV
 //
 // Start here
 //
+var gl;
 function main() {
     const canvas = document.querySelector('#glcanvas');
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     document.addEventListener('keydown', function (event) {
         if (event.keyCode == 65) {
@@ -363,26 +378,23 @@ function main() {
 
     const vsSource = `
     attribute vec4 aVertexPosition;
-    attribute vec4 aVertexColor;
-
+    attribute vec2 aTextureCoord;
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
-
-    varying lowp vec4 vColor;
-
+    varying highp vec2 vTextureCoord;
     void main(void) {
       gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-      vColor = aVertexColor;
+      vTextureCoord = aTextureCoord;
     }
   `;
 
     // Fragment shader program
 
-    const fsSource = `
-    varying lowp vec4 vColor;
-
+    fsSource = `
+    varying highp vec2 vTextureCoord;
+    uniform sampler2D uSampler;
     void main(void) {
-      gl_FragColor = vColor;
+      gl_FragColor = texture2D(uSampler, vTextureCoord);
     }
   `;
 
@@ -398,18 +410,19 @@ function main() {
         program: shaderProgram,
         attribLocations: {
             vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
-            vertexColor: gl.getAttribLocation(shaderProgram, 'aVertexColor'),
+            textureCoord: gl.getAttribLocation(shaderProgram, 'aTextureCoord'),
         },
         uniformLocations: {
             projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
             modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+            uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
         },
     };
 
     // Here's where we call the routine that builds all the
     // objects we'll be drawing.
 
-    var tunnelN = 100;
+    var tunnelN = 50;
     var obstacN = 5;
     var wall = [];
     var wallBuffers = [];
@@ -419,10 +432,19 @@ function main() {
     var n = 8;
     var depth = 0.5;
     var i = 0;
+    
+    brickTexture = loadTexture(gl, 'brickTexture.jpeg');
+    // brickTexture2 = loadTexture(gl, 'cubetexture.png');
+
+    brickTexture2 = loadTexture(gl, 'brickTexture2.jpeg');
+
     for(;i<tunnelN;i++)
     {
-        wall[i] = createPolyhedron(n,radius,depth,-2*i*depth);
-        wallBuffers[i] = initBuffers(gl,wall[i]);
+        // wall[i] = createPolyhedron(n,radius,depth,-2*i*depth);
+        wall[i] = new Polyhedron(n,radius,depth,-2*i*depth);
+        // wall[i] = wall[i].createShape;
+        wallBuffers[i] = wall[i].createBuffers;
+        // wallBuffers[i] = initBuffers(gl,wall[i]);
     }
     var then = 0;
     var k = i;
@@ -434,23 +456,26 @@ function main() {
         //
         gMat = initScene(gl);
         //
-        for(var i=0;i<wall.length;i++)
+        for(var l=0;l<wall.length;l++)
         {
-            drawScene(gl, programInfo, wallBuffers[i], deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
+            drawScene(gl, programInfo, wallBuffers[l], brickTexture, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix);
         }
         if(-wall[0].zoffset < covDis)
         {
             wall.shift();
             wallBuffers.shift();
-            var last = createPolyhedron(n,radius,depth, -2*(k++)*depth);
+            var last = new Polyhedron(n, radius, depth, -2*(k++)*depth);
+            // var last = createPolyhedron(n,radius,depth, -2*(k++)*depth);
             wall.push(last);
             // console.log(i);
-            wallBuffers.push(initBuffers(gl,last));
+            wallBuffers.push(last.createBuffers);
             if(k%10 == 0)
             {
-                obs = createObstacle(n, radius, 0.5, -covDis-15);
+                // obs = createObstacle(n, radius, 0.5, -covDis-15);
+                obs  = new Obstacle(n, radius, 0.5, -covDis -15);
                 obstac.push(obs);
-                obstacBuffers.push(initBuffers(gl, obs));
+                // obstacBuffers.push(initBuffers(gl, obs));
+                obstacBuffers.push(obs.createBuffers);
             }
         }
         for(var i= 0;i<obstac.length;i++)
@@ -460,7 +485,7 @@ function main() {
                     gMat.modelViewMatrix,  // matrix to rotate
                     obsRotation,     // amount to rotate in radians
                     [0, 0, 1]);       // axis to rotate around (Z)
-            drawScene(gl, programInfo, obstacBuffers[i], deltaTime, gMat.projectionMatrix, obsModelViewMatrix);
+            drawScene(gl, programInfo, obstacBuffers[i], brickTexture2, deltaTime, gMat.projectionMatrix, obsModelViewMatrix);
         }
 
         requestAnimationFrame(render);
