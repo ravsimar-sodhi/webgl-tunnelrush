@@ -72,13 +72,13 @@ function createPolyhedron(n, radius, depth, zoffset) {
         indices[k++] = (4 * i + 3) % (4 * n);
     }
    
-    /* var faceColors = [];
+    var faceColors = [];
     for(var i=0;i<n;i++)
     {
-        faceColors[i] = tileColors[Math.floor(Math.random()*n)];
-    } */
+        faceColors[i] = tileColors[Math.floor(Math.random()*tileColors.length)];
+    }
     return {
-        // 'faceColors': faceColors,
+        'faceColors': faceColors,
         'colNumComponents': 4,
         'posNumComponents': 3,
         'vertexCount': 48,
@@ -110,7 +110,7 @@ function initPolyhedronBuffers(gl, shape) {
 
     // Convert the array of colors into a table for all the vertices.
 
-    /*  var colors = [];
+     var colors = [];
      var faceColors = shape.faceColors;
  
      for (var j = 0; j < faceColors.length; ++j) {
@@ -120,7 +120,8 @@ function initPolyhedronBuffers(gl, shape) {
      }
  
      gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW); */
+     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW); 
+    
 
     gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
     var textureCoordinates = [];
@@ -156,7 +157,7 @@ function initPolyhedronBuffers(gl, shape) {
         new Uint16Array(indices), gl.STATIC_DRAW);
 
     return {
-        // color: colorBuffer,
+        color: colorBuffer,
         position: positionBuffer,
         normal: normalBuffer,
         indices: indexBuffer,

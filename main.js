@@ -1,10 +1,13 @@
 var tileRotation = 0.0;
 var obsRotation = 0.0;
 var gameSpeed = 0.05;
+// var gameSpeed = 0.0;
+var levelScore = 50;
 var covDis = 0.0;
 var currPos = {x: 0.0,y:0.7,z:covDis};
 var left,right,jump;
 var texture;
+var mode = 0;
 
 var tileColors = [
     [0.2, 0.2, 1.0, 1.0],    // blue
@@ -16,6 +19,7 @@ var tileColors = [
     [1.0, 0.0, 1.0, 1.0],    // purple
     [0.2, 1.0, 1.0, 1.0],    // turqoise
 ]
+
 main();
 
 //
@@ -110,10 +114,8 @@ function loadTexture(gl, url) {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         }
-        console.log("lulz");
     };
     image.src = url;
-    console.log(image.src);
 
     return texture;
 }
@@ -169,77 +171,6 @@ function initScene(gl) {
     mat4.transpose(normalMatrix, normalMatrix);
     return { projectionMatrix, modelViewMatrix, normalMatrix };
 }
-function initBuffers(gl, shape) {
-    positionBuffer = gl.createBuffer();
-    colorBuffer = gl.createBuffer();
-    indexBuffer = gl.createBuffer();
-    textureBuffer = gl.createBuffer();
- 
-    // Create a buffer for the cube's vertex positions.
-    var positions = shape.positions;
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-
-    // Convert the array of colors into a table for all the vertices.
-
-   /*  var colors = [];
-    var faceColors = shape.faceColors;
-
-    for (var j = 0; j < faceColors.length; ++j) {
-        const c = faceColors[j];
-        // Repeat each color four times for the four vertices of the face
-        colors = colors.concat(c, c, c, c);
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW); */
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
-    var textureCoordinates = [];
-    var k = 0;
-    for(var i=0;i<shape.indices.length/3;i++)
-    {
-        textureCoordinates[k++] = 0.0;
-        textureCoordinates[k++] = 0.0;
-        
-        // textureCoordinates[k++] = 1.0;
-        // textureCoordinates[k++] = 0.0;
-        
-        textureCoordinates[k++] = 1.0;
-        textureCoordinates[k++] = 1.0;
-        
-        textureCoordinates[k++] = 0.0;
-        textureCoordinates[k++] = 1.0;
-    }
-
-
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
-    // Build the element array buffer; this specifies the indices
-    // into the vertex arrays for each face's vertices.
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-
-    // This array defines each face as two triangles, using the
-    // indices into the vertex array to specify each triangle's
-    // position.
-    // Now send the element array to GL
-    var indices = shape.indices;
-
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
-        new Uint16Array(indices), gl.STATIC_DRAW);
-
-    return {
-        position: positionBuffer,
-        // color: colorBuffer,
-        texture: textureBuffer,
-        indices: indexBuffer,
-        vertexCount: shape.vertexCount,
-        posNumComponents: shape.posNumComponents,
-        colNumComponents: shape.colNumComponents,  
-    };
-}
 
 //
 // Draw the scene.
@@ -268,7 +199,7 @@ function drawScene(gl, programInfo, buffers, texture, deltaTime, projectionMatri
 
     // Tell WebGL how to pull out the colors from the color buffer
     // into the vertexColor attribute.
-    /* {
+/*     {
         const numComponents = buffers.colNumComponents;
         const type = gl.FLOAT;
         const normalize = false;
@@ -364,6 +295,98 @@ function drawScene(gl, programInfo, buffers, texture, deltaTime, projectionMatri
 
     // tileRotation += deltaTime;
 }
+function coldrawScene(gl, programInfo, buffers, deltaTime, projectionMatrix, modelViewMatrix, normalMatrix) {
+    // Tell WebGL how to pull out the positions from the position
+    // buffer into the vertexPosition attribute
+
+    {
+        const numComponents = buffers.posNumComponents;
+        const type = gl.FLOAT;
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+        gl.vertexAttribPointer(
+            programInfo.attribLocations.vertexPosition,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        gl.enableVertexAttribArray(
+            programInfo.attribLocations.vertexPosition);
+    }
+
+    // Tell WebGL how to pull out the colors from the color buffer
+    // into the vertexColor attribute.
+    {
+        const numComponents = buffers.colNumComponents;
+        const type = gl.FLOAT;
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
+        gl.vertexAttribPointer(
+            programInfo.attribLocations.vertexColor,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        gl.enableVertexAttribArray(
+            programInfo.attribLocations.vertexColor);
+    }
+    {
+        const numComponents = 3;
+        const type = gl.FLOAT;
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.normal);
+        gl.vertexAttribPointer(
+            programInfo.attribLocations.vertexNormal,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        gl.enableVertexAttribArray(
+            programInfo.attribLocations.vertexNormal);
+    }
+    // Tell WebGL which indices to use to index the vertices
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
+
+    // Tell WebGL to use our program when drawing
+
+    gl.useProgram(programInfo.program);
+
+    // Set the shader uniforms
+
+    gl.uniformMatrix4fv(
+        programInfo.uniformLocations.projectionMatrix,
+        false,
+        projectionMatrix);
+    gl.uniformMatrix4fv(
+        programInfo.uniformLocations.modelViewMatrix,
+        false,
+        modelViewMatrix);
+    gl.uniformMatrix4fv(
+        programInfo.uniformLocations.normalMatrix,
+        false,
+        normalMatrix);
+
+    {
+        const vertexCount = buffers.vertexCount;
+        const type = gl.UNSIGNED_SHORT;
+        const offset = 0;
+        gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+    }
+
+    // Update the rotation for the next draw
+
+    // tileRotation += deltaTime;
+}
+
 //
 // Start here
 //
@@ -382,6 +405,10 @@ function main() {
             right = 1;
             // tileRotation -= 0.02;
             // alert('Right was pressed');
+        }
+        if(event.keyCode == 84)
+        {
+            mode = !mode;
         }
 
 
@@ -439,10 +466,54 @@ function main() {
       gl_FragColor = vec4(texelColor.rgb * vLighting, texelColor.a);
     }
   `;
+    const colvsSource = `
+    attribute vec4 aVertexPosition;
+    attribute vec3 aVertexNormal;
+    
+    attribute vec4 aVertexColor;
+
+    uniform mat4 uModelViewMatrix;
+    uniform mat4 uNormalMatrix;
+    varying highp vec2 vTextureCoord;
+    
+    uniform mat4 uProjectionMatrix;
+    varying highp vec3 vLighting;
+
+    varying highp vec4 vColor;
+
+    void main(void) {
+      gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+      highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
+      highp vec3 directionalLightColor = vec3(1, 1, 1);
+      highp vec3 directionalVector = normalize(vec3(0.5, -1.0, 1.0));
+      
+      highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+      
+      highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+      vLighting = ambientLight + (directionalLightColor * directional);
+      vColor = aVertexColor;
+    }
+  `;
+
+    // Fragment shader program
+
+    const colfsSource = `
+    varying highp vec4 vColor;
+    varying highp vec3 vLighting;
+    uniform sampler2D uSampler;
+    varying highp vec2 vTextureCoord;
+    
+    void main(void) {
+      highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+      texelColor= vColor;
+      gl_FragColor = vec4(texelColor.rgb * vLighting, texelColor.a);
+    }
+    `;
 
     // Initialize a shader program; this is where all the lighting
     // for the vertices and so forth is established.
     const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+    const colshaderProgram = initShaderProgram(gl, colvsSource, colfsSource);
 
     // Collect all the info needed to use the shader program.
     // Look up which attributes our shader program is using
@@ -462,6 +533,21 @@ function main() {
             uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
         },
     };
+    const colprogramInfo = {
+        program: colshaderProgram,
+        attribLocations: {
+            vertexPosition: gl.getAttribLocation(colshaderProgram, 'aVertexPosition'),
+            vertexNormal: gl.getAttribLocation(colshaderProgram, 'aVertexNormal'),
+            vertexColor: gl.getAttribLocation(colshaderProgram, 'aVertexColor'),
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(colshaderProgram, 'uProjectionMatrix'),
+            modelViewMatrix: gl.getUniformLocation(colshaderProgram, 'uModelViewMatrix'),
+            normalMatrix: gl.getUniformLocation(colshaderProgram, 'uNormalMatrix'),
+            uSampler: gl.getUniformLocation(colshaderProgram, 'uSampler'),
+            
+        },
+    }
 
     // Here's where we call the routine that builds all the
     // objects we'll be drawing.
@@ -502,7 +588,15 @@ function main() {
         //
         for(var l=0;l<wall.length;l++)
         {
-            drawScene(gl, programInfo, wallBuffers[l], brickTexture, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix, gMat.normalMatrix);
+            if(mode == 1)
+            {
+                drawScene(gl, programInfo, wallBuffers[l], brickTexture, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix, gMat.normalMatrix);
+            }
+            else
+            {
+                coldrawScene(gl, colprogramInfo, wallBuffers[l],  deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix, gMat.normalMatrix);
+            }
+
         }
         if(-wall[0].zoffset < covDis)
         {
@@ -515,14 +609,53 @@ function main() {
             wallBuffers.push(last.createBuffers);
             if(k%10 == 0)
             {
+                
                 rot = Math.random()*3;
                 rotSpeed = Math.random()*0.05;
                 // obs = createObstacle(n, radius, 0.5, -covDis-15);
-                obs  = new Obstacle(n, radius, 0.5, -covDis-15, rot, rotSpeed);
-                obstac.push(obs);
-                // obstacBuffers.push(initBuffers(gl, obs));
-                obstacBuffers.push(obs.createBuffers);
-                console.log(obs);
+                if(k%20 == 0)
+                {
+                    obs  = new Obstacle2(n, radius, 0.5, -covDis-15, 0, rotSpeed);
+                    obs2  = new Obstacle2(n, radius, 0.5, -covDis-15, 0+Math.PI/2, rotSpeed);
+                    obstac.push(obs);
+                    obstac.push(obs2);
+                    // obstacBuffers.push(initBuffers(gl, obs));
+                    obstacBuffers.push(obs.createBuffers);
+                    obstacBuffers.push(obs2.createBuffers);
+                }
+                else
+                {
+                    obs  = new Obstacle(n, radius, 0.5, -covDis-15, rot, rotSpeed);
+                    obstac.push(obs);
+                    obstacBuffers.push(obs.createBuffers);
+                }
+                while(-obstac[0].zoffset < covDis) {
+                    obstac.shift();
+                    obstacBuffers.shift();
+                }
+            }
+            
+            if(k%20 == 0)
+            {
+                if(tileColors.length == 8)
+                {
+                    tileColors = [
+                        [1.0, 1.0, 1.0, 1.0],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ]
+                }
+                else if (tileColors.length == 2) {
+                    tileColors = [
+                        [0.2, 0.2, 1.0, 1.0],    // blue
+                        [0.6, 0.7, 0.8, 1.0],    // red
+                        [0.1, 1.0, 0.1, 1.0],    // green
+                        [1.0, 0.7, 0.2, 1.0],    // orange
+                        [0.5, 0.1, 0.5, 1.0],    // dark purple
+                        [1.0, 1.0, 0.0, 1.0],    // yellow
+                        [1.0, 0.0, 1.0, 1.0],    // purple
+                        [0.2, 1.0, 1.0, 1.0],    // turqoise
+                    ]
+                }
             }
         }
         for(var i= 0;i<obstac.length;i++)
@@ -536,7 +669,26 @@ function main() {
                     [0, 0, 1]);       // axis to rotate around (Z)
             // console.log(obstac[i].rotSpeed);
             obstac[i].rot += obstac[i].rotSpeed;
-            drawScene(gl, programInfo, obstacBuffers[i], brickTexture2, deltaTime, gMat.projectionMatrix, obsModelViewMatrix,gMat.normalMatrix);
+            if (obstac[i].rot > 2 * Math.PI) {
+                obstac[i].rot -= 2 * Math.PI;
+            }
+            if (obstac[i].rot < 0) {
+                obstac[i].rot += 2 * Math.PI;
+            }
+            if(mode == 1)
+            {
+                drawScene(gl, programInfo, obstacBuffers[i], brickTexture2, deltaTime, gMat.projectionMatrix, obsModelViewMatrix,gMat.normalMatrix);
+            }
+            else
+            {
+                coldrawScene(gl, colprogramInfo, obstacBuffers[i],  deltaTime, gMat.projectionMatrix, obsModelViewMatrix,gMat.normalMatrix);
+            }
+            if(Math.abs(-covDis - obstac[i].zoffset) < 0.02  && Math.abs(tileRotation - obstac[i].collrot) < Math.PI)
+            {
+                console.log("collision");
+            }
+            // console.log(covDis);
+            // console.log(i,obstac[i].zoffset);
         }
 
         requestAnimationFrame(render);
@@ -544,7 +696,7 @@ function main() {
         covDis += gameSpeed;
         currPos.z = covDis;
         // obsRotation -= gameSpeed/3;
-        
+        // console.log(tileRotation);
         if (left == 1) {
             tileRotation += 2*deltaTime;
             left = 0;
@@ -552,6 +704,13 @@ function main() {
         if (right == 1) {
             tileRotation -= 2*deltaTime;
             right = 0;
+        }
+        if(tileRotation > 2 * Math.PI)
+        {
+            tileRotation -= 2*Math.PI;
+        }
+        if (tileRotation < 0) {
+            tileRotation += 2 * Math.PI;
         }
         if(jump == 1)
         {
@@ -571,7 +730,12 @@ function main() {
                 currPos.y += 2*deltaTime;
             }
         }
-        
+        document.getElementById('score').innerHTML=Math.floor(covDis);
+        if(covDis > levelScore && gameSpeed < 0.2)
+        {
+            levelScore += 50;
+            gameSpeed=gameSpeed + 0.05;
+        }
     }
     requestAnimationFrame(render);
 }
