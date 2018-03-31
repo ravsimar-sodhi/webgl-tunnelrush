@@ -7,6 +7,7 @@ function Obstacle2(n, radius, depth, zoffset, rot, rotSpeed) {
     this.createBuffers = initObstacle2Buffers(gl, this.createShape);
     this.rot = rot;
     this.rotSpeed = rotSpeed;
+    this.type = 2;
     return this;
 }
 function createObstacle2(n, radius, depth, zoffset, rot) {
@@ -17,19 +18,18 @@ function createObstacle2(n, radius, depth, zoffset, rot) {
     positions[k++] = 0;
     positions[k++] = 0;
     positions[k++] = zoffset;
-    for (var i = 0; i <= n / 2; i++) {
+    for (var i = 0; i < n; i++) {
         positions[k++] = r * Math.cos(angle);
         positions[k++] = r * Math.sin(angle);
         positions[k++] = zoffset;
-        angle += (0.5*Math.PI) / n;
-
+        angle += (2 * Math.PI) / n;
     }
     var normals = [];
     var k = 0;
     normals[k++] = 0;
     normals[k++] = 0;
     normals[k++] = 1.0;
-    for (var i = 0; i <= n / 2; i++) {
+    for (var i = 0; i < n; i++) {
         normals[k++] = 0;
         normals[k++] = 0;
         normals[k++] = -1.0;
@@ -38,8 +38,8 @@ function createObstacle2(n, radius, depth, zoffset, rot) {
     var k = 0;
     for (var i = 0; i < n / 2; i++) {
         indices[k++] = 0;
-        indices[k++] = (i + 1);
-        indices[k++] = (i + 2);
+        indices[k++] = (2*i + 1);
+        indices[k++] = (2*i + 2);
     }
     var faceColors = [];
     for (var i = 0; i < n / 2; i++) {
@@ -84,7 +84,7 @@ function initObstacle2Buffers(gl, shape) {
     for (var j = 0; j < faceColors.length; ++j) {
         const c = faceColors[j];
         // Repeat each color four times for the four vertices of the face
-        colors = colors.concat(c, c, c, c);
+        colors = colors.concat(c, c, c);
     }
 
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
@@ -101,17 +101,13 @@ function initObstacle2Buffers(gl, shape) {
         textureCoordinates[k++] = 1.0;
         textureCoordinates[k++] = 0.0;
 
-        textureCoordinates[k++] = 0.0;
-        textureCoordinates[k++] = 1.0;
-
         textureCoordinates[k++] = 1.0;
         textureCoordinates[k++] = 1.0;
 
         textureCoordinates[k++] = 0.0;
         textureCoordinates[k++] = 1.0;
 
-        textureCoordinates[k++] = 1.0;
-        textureCoordinates[k++] = 1.0;
+        
     }
 
 

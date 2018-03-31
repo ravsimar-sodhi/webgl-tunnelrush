@@ -8,12 +8,13 @@ function Obstacle(n, radius, depth, zoffset, rot, rotSpeed) {
     this.rot = rot;
     this.collrot = rot + Math.PI;
     this.rotSpeed = rotSpeed;
+    this.type = 1;
     return this;
 }
 function createObstacle(n, radius, depth, zoffset,rot) {
     var r = radius;
     var k = 0;
-    var angle = rot;
+    var angle = rot - Math.PI/2;
     var positions = [];
     positions[k++] = 0;
     positions[k++] = 0;

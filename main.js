@@ -2,7 +2,7 @@ var tileRotation = 0.0;
 var obsRotation = 0.0;
 var gameSpeed = 0.05;
 // var gameSpeed = 0.0;
-var levelScore = 50;
+var levelScore = 100;
 var covDis = 0.0;
 var currPos = {x: 0.0,y:0.7,z:covDis};
 var left,right,jump;
@@ -164,7 +164,7 @@ function initScene(gl) {
         [currPos.x, currPos.y, currPos.z]);  // amount to translate
     mat4.rotate(modelViewMatrix,  // destination matrix
         modelViewMatrix,  // matrix to rotate
-        tileRotation,     // amount to rotate in radians
+        -tileRotation,     // amount to rotate in radians
         [0, 0, 1]);       // axis to rotate around (Z)
     const normalMatrix = mat4.create();
     mat4.invert(normalMatrix, modelViewMatrix);
@@ -391,10 +391,7 @@ function coldrawScene(gl, programInfo, buffers, deltaTime, projectionMatrix, mod
 // Start here
 //
 var gl;
-function main() {
-    const canvas = document.querySelector('#glcanvas');
-    gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+function eventHandlers(){
     document.addEventListener('keydown', function (event) {
         if (event.keyCode == 65) {
             left = 1;
@@ -406,9 +403,8 @@ function main() {
             // tileRotation -= 0.02;
             // alert('Right was pressed');
         }
-        if(event.keyCode == 84)
-        {
-            mode = !mode;
+        if (event.keyCode == 84) {
+            mode = (mode + 1) % 3;
         }
 
 
@@ -418,6 +414,12 @@ function main() {
             jump = 1;
         }
     })
+}
+function main() {
+    const canvas = document.querySelector('#glcanvas');
+    gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    eventHandlers();
     // If we don't have a GL context, give up now
 
     if (!gl) {
@@ -564,9 +566,11 @@ function main() {
     var i = 0;
     
     brickTexture = loadTexture(gl, 'brickTexture.jpeg');
-    // brickTexture2 = loadTexture(gl, 'cubetexture.png');
+    patternTexture = loadTexture(gl, 'patternTexture.jpeg');
+    // metalTexture = loadTexture(gl, 'cubetexture.png');
 
-    brickTexture2 = loadTexture(gl, 'metalTexture.jpeg');
+    metalTexture = loadTexture(gl, 'metalTexture.jpeg');
+    patternTexture2 = loadTexture(gl, 'patternTexture2.jpeg');
 
     for(;i<tunnelN;i++)
     {
@@ -588,47 +592,45 @@ function main() {
         //
         for(var l=0;l<wall.length;l++)
         {
-            if(mode == 1)
-            {
-                drawScene(gl, programInfo, wallBuffers[l], brickTexture, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix, gMat.normalMatrix);
+            switch(mode){
+                case 0:
+                    coldrawScene(gl, colprogramInfo, wallBuffers[l],  deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix, gMat.normalMatrix);
+                    break;
+                case 1:
+                    drawScene(gl, programInfo, wallBuffers[l], brickTexture, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix, gMat.normalMatrix);
+                    break;
+                case 2:
+                    drawScene(gl, programInfo, wallBuffers[l], patternTexture, deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix, gMat.normalMatrix);
+                default:
             }
-            else
-            {
-                coldrawScene(gl, colprogramInfo, wallBuffers[l],  deltaTime, gMat.projectionMatrix, gMat.modelViewMatrix, gMat.normalMatrix);
-            }
-
         }
         if(-wall[0].zoffset < covDis)
         {
             wall.shift();
             wallBuffers.shift();
             var last = new Polyhedron(n, radius, depth, -2*(k++)*depth);
-            // var last = createPolyhedron(n,radius,depth, -2*(k++)*depth);
             wall.push(last);
-            // console.log(i);
             wallBuffers.push(last.createBuffers);
             if(k%10 == 0)
             {
-                
-                rot = Math.random()*3;
-                rotSpeed = Math.random()*0.05;
-                // obs = createObstacle(n, radius, 0.5, -covDis-15);
-                if(k%20 == 0)
+                if(levelScore > 100)
+                    rot = Math.random()*Math.PI;
+                else
+                    rot = 0;
+                if(levelScore > 100)
+                    rotSpeed = Math.random()*0.05;
+                else
+                    rotSpeed = 0;
+                if(k%50 != 0)
                 {
-                    obs  = new Obstacle2(n, radius, 0.5, -covDis-15, 0, rotSpeed);
-                    obs2  = new Obstacle2(n, radius, 0.5, -covDis-15, 0+Math.PI/2, rotSpeed);
-                    obstac.push(obs);
-                    obstac.push(obs2);
-                    // obstacBuffers.push(initBuffers(gl, obs));
-                    obstacBuffers.push(obs.createBuffers);
-                    obstacBuffers.push(obs2.createBuffers);
+                    obs  = new Obstacle2(n, radius, 0.5, -covDis-15, rot, rotSpeed);
                 }
                 else
                 {
                     obs  = new Obstacle(n, radius, 0.5, -covDis-15, rot, rotSpeed);
-                    obstac.push(obs);
-                    obstacBuffers.push(obs.createBuffers);
                 }
+                obstac.push(obs);
+                obstacBuffers.push(obs.createBuffers);
                 while(-obstac[0].zoffset < covDis) {
                     obstac.shift();
                     obstacBuffers.shift();
@@ -660,14 +662,11 @@ function main() {
         }
         for(var i= 0;i<obstac.length;i++)
         {
-            // console.log(obstac[i].rot);
             var obsModelViewMatrix = mat4.create();
             mat4.rotate(obsModelViewMatrix,  // destination matrix
                     gMat.modelViewMatrix,  // matrix to rotate
-                    // obsRotation,
                     obstac[i].rot,     // amount to rotate in radians
                     [0, 0, 1]);       // axis to rotate around (Z)
-            // console.log(obstac[i].rotSpeed);
             obstac[i].rot += obstac[i].rotSpeed;
             if (obstac[i].rot > 2 * Math.PI) {
                 obstac[i].rot -= 2 * Math.PI;
@@ -675,34 +674,58 @@ function main() {
             if (obstac[i].rot < 0) {
                 obstac[i].rot += 2 * Math.PI;
             }
-            if(mode == 1)
+            switch(mode){
+                case 0:
+                    coldrawScene(gl, colprogramInfo, obstacBuffers[i],  deltaTime, gMat.projectionMatrix, obsModelViewMatrix,gMat.normalMatrix);
+                    break;
+                case 1:
+                    drawScene(gl, programInfo, obstacBuffers[i], metalTexture, deltaTime, gMat.projectionMatrix, obsModelViewMatrix,gMat.normalMatrix);
+                    break;
+                case 2:
+                    drawScene(gl, programInfo, obstacBuffers[i], patternTexture2, deltaTime, gMat.projectionMatrix, obsModelViewMatrix,gMat.normalMatrix);
+                    break;
+                default:
+
+                }
+        }
+        for(var i=0;i<obstac.length;i++)
+        {
+            if(Math.abs(-covDis - obstac[i].zoffset) < 0.5)
             {
-                drawScene(gl, programInfo, obstacBuffers[i], brickTexture2, deltaTime, gMat.projectionMatrix, obsModelViewMatrix,gMat.normalMatrix);
+                console.log(tileRotation, obstac[i].rot);
+                // if(-Math.cos(tileRotation) -Math.sin(tileRotation)*Math.tan(obstac[i].rot) >=0)
+                // if(obstac[i].rot - tileRotation >= Math.PI/2 || tileRotation >= obstac[i].rot + Math.PI/2)
+                if(obstac[i].type == 1)
+                {
+                    if(tileRotation >=  obstac[i].rot  && tileRotation <= obstac[i].rot + Math.PI && currPos.y >= 0)
+                    {
+                        return 0;
+                    }
+                }
+                else
+                {
+                    if(tileRotation >= obstac[i].rot && tileRotation <= obstac[i].rot + Math.PI/4 || 
+                        tileRotation >= obstac[i].rot + Math.PI/2 && tileRotation <= obstac[i].rot + 3*Math.PI / 4 ||
+                        tileRotation >= obstac[i].rot + Math.PI && tileRotation <= obstac[i].rot + 5*Math.PI / 4 || 
+                        tileRotation >= obstac[i].rot + 3*Math.PI/2 && tileRotation <= obstac[i].rot + 7*Math.PI / 4)
+                    {
+                        return 0;
+                    }
+                }
             }
-            else
-            {
-                coldrawScene(gl, colprogramInfo, obstacBuffers[i],  deltaTime, gMat.projectionMatrix, obsModelViewMatrix,gMat.normalMatrix);
-            }
-            if(Math.abs(-covDis - obstac[i].zoffset) < 0.02  && Math.abs(tileRotation - obstac[i].collrot) < Math.PI)
-            {
-                console.log("collision");
-            }
-            // console.log(covDis);
-            // console.log(i,obstac[i].zoffset);
         }
 
-        requestAnimationFrame(render);
         
         covDis += gameSpeed;
         currPos.z = covDis;
         // obsRotation -= gameSpeed/3;
         // console.log(tileRotation);
         if (left == 1) {
-            tileRotation += 2*deltaTime;
+            tileRotation -= 2*deltaTime;
             left = 0;
         }
         if (right == 1) {
-            tileRotation -= 2*deltaTime;
+            tileRotation += 2*deltaTime;
             right = 0;
         }
         if(tileRotation > 2 * Math.PI)
@@ -731,11 +754,13 @@ function main() {
             }
         }
         document.getElementById('score').innerHTML=Math.floor(covDis);
+        document.getElementById('level').innerHTML=levelScore/100;
         if(covDis > levelScore && gameSpeed < 0.2)
         {
-            levelScore += 50;
+            levelScore += 100;
             gameSpeed=gameSpeed + 0.05;
         }
+        requestAnimationFrame(render);
     }
     requestAnimationFrame(render);
 }
